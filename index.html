@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prima Mill Performance Monitoring</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Exo+2:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+<style>
+:root {
+  --bg: #07090d;
+  --bg-card: #0b0f15;
+  --bg-card-h: #10161f;
+  --border: rgba(255,255,255,0.08);
+  --tp: #ddeeff; --ts: #4a6a85; --tm: #1e3347;
+  --green: #00e676; --red: #ff3b52; --yellow: #ffc107; --cyan: #00e5ff;
+  --scan: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow-x:hidden; }
+body {
+  background: var(--bg); color: var(--tp);
+  font-family: 'Exo 2', sans-serif;
+  display: flex; flex-direction: column; min-height: 100vh;
+  background-image:
+    radial-gradient(ellipse at 10% 0%,rgba(0,229,255,0.05) 0%,transparent 50%),
+    radial-gradient(ellipse at 90% 100%,rgba(0,230,118,0.03) 0%,transparent 50%);
+}
+
+/* ── HEADER ── */
+header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px; height:50px; flex-shrink:0;
+  background: rgba(6,8,13,0.95);
+  border-bottom: 1px solid var(--cyan);
+  box-shadow: 0 0 15px rgba(0, 229, 255, 0.1);
+  position:sticky; top:0; z-index:100;
+  backdrop-filter: blur(20px);
+}
+.hl { display:flex; align-items:center; gap:12px; }
+.badge {
+  display:flex; align-items:center; gap:5px;
+  background: rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.4);
+  border-radius:3px; padding:3px 8px;
+  font-family: 'Share Tech Mono', monospace; font-size:9px; letter-spacing:2px; color:var(--green);
+  white-space: nowrap; box-shadow: 0 0 8px rgba(0,230,118,0.2);
+}
+.dot { width:6px; height:6px; background:var(--green); border-radius:50%; animation:blink 1.4s infinite; box-shadow:0 0 5px var(--green); }
+@keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0.1;} }
+.title { font-family:'Rajdhani', sans-serif; font-size:16px; font-weight:700; letter-spacing:3px; white-space:nowrap; text-shadow: 0 0 5px rgba(255,255,255,0.2);}
+.title span { color:var(--cyan); text-shadow: 0 0 8px var(--cyan); }
+.hr { display:flex; align-items:center; gap:12px; }
+.clk { font-family:'Share Tech Mono', monospace; font-size:11px; color:var(--cyan); letter-spacing:.8px; white-space:nowrap; }
+.cd { font-family:'Share Tech Mono', monospace; font-size:9px; color:var(--ts); letter-spacing:1px; white-space:nowrap; }
+.btn {
+  background: rgba(0,229,255,0.05); border:1px solid rgba(0,229,255,0.3);
+  color: var(--cyan); border-radius:3px; padding:4px 12px;
+  font-family: 'Rajdhani', sans-serif; font-size:11px; font-weight:700; letter-spacing:1.5px;
+  cursor: pointer; transition:all .3s ease; display:flex; align-items:center; gap:5px; white-space:nowrap;
+}
+.btn:hover { background: rgba(0,229,255,0.2); border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,229,255,0.3); }
+.btn:active { transform:scale(.95); }
+.btn svg { width:11px; height:11px; flex-shrink:0; }
+.spinning { animation:spin .8s linear infinite; }
+@keyframes spin { to {transform:rotate(360deg);} }
+
+/* ── MAIN & GRID ── */
+main { flex:1; display:flex; flex-direction:column; padding:12px 16px; gap:4px; }
+.sec {
+  font-family: 'Share Tech Mono', monospace; font-size:10px; font-weight: bold;
+  letter-spacing:4px; color:var(--cyan);
+  padding:15px 4px 8px; display:flex; align-items:center; gap:8px;
+  text-shadow: 0 0 5px rgba(0, 229, 255, 0.3);
+}
+.sec::after { content:''; flex:1; height:1px; background:linear-gradient(90deg, var(--cyan), transparent); opacity: 0.3;}
+.grid { display:grid; gap:12px; grid-template-columns:repeat(5,1fr); flex: 2; }
+.grid-ext { display:grid; gap:12px; grid-template-columns:repeat(5,1fr); flex: 1; }
+
+/* ── CARD ── */
+.card {
+  background: var(--bg-card); border:1px solid var(--border); border-radius:8px;
+  padding:15px 15px 5px; position:relative; overflow:hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display:flex; flex-direction:column;
+}
+.card::before { content:''; position:absolute; inset:0; background:var(--scan); pointer-events:none; opacity:.2; }
+.card:hover {
+  background: var(--bg-card-h);
+  transform: translateY(-5px);
+  z-index: 10;
+}
+.card.ok   { border-bottom: 3px solid var(--green); }
+.card.warn { border-bottom: 3px solid var(--yellow); }
+.card.bad  { border-bottom: 3px solid var(--red); }
+.card.info { border-bottom: 3px solid var(--cyan); }
+
+.card.ok:hover   { box-shadow: 0 8px 25px rgba(0,230,118,0.15), 0 0 10px rgba(0,230,118,0.2) inset; border-color: var(--green); }
+.card.warn:hover { box-shadow: 0 8px 25px rgba(255,193,7,0.15), 0 0 10px rgba(255,193,7,0.2) inset; border-color: var(--yellow); }
+.card.bad:hover  { box-shadow: 0 8px 25px rgba(255,59,82,0.15), 0 0 10px rgba(255,59,82,0.2) inset; border-color: var(--red); }
+.card.info:hover { box-shadow: 0 8px 25px rgba(0,229,255,0.15), 0 0 10px rgba(0,229,255,0.2) inset; border-color: var(--cyan); }
+
+.card-label {
+  font-family: 'Share Tech Mono', monospace; font-size:9px; font-weight: bold;
+  letter-spacing:1px; color:var(--ts); text-transform:uppercase;
+  margin-bottom:8px; flex-shrink:0; position: relative; z-index: 2;
+}
+.card-val {
+  font-family: 'Rajdhani', sans-serif; font-weight:700;
+  line-height:1; margin-bottom:2px; flex:1;
+  display:flex; align-items:center;
+  font-size:clamp(24px, 3vw, 42px);
+  text-shadow: 0 0 10px rgba(255,255,255,0.1);
+  position: relative; z-index: 2;
+}
+.card.ok .card-val   { color:var(--green); text-shadow: 0 0 10px rgba(0,230,118,0.3); }
+.card.warn .card-val { color:var(--yellow); text-shadow: 0 0 10px rgba(255,193,7,0.3); }
+.card.bad .card-val  { color:var(--red); text-shadow: 0 0 10px rgba(255,59,82,0.3); }
+.card.info .card-val { color:var(--cyan); text-shadow: 0 0 10px rgba(0,229,255,0.3); }
+
+.card-sub {
+  font-family: 'Share Tech Mono', monospace; font-size:9px;
+  color:var(--ts); margin-bottom:5px; flex-shrink:0; position: relative; z-index: 2;
+}
+
+/* container grafik sparkline */
+.chart-container {
+  height: 50px; width: 100%; margin-top: -10px; position: relative; z-index: 1;
+}
+
+/* Tooltip on hover */
+.card-tooltip {
+  position:absolute; top:10px; right:10px;
+  background: rgba(15, 25, 35, 0.9); border:1px solid var(--cyan); border-radius:4px;
+  padding:4px 8px; font-family:'Share Tech Mono', monospace; font-size:9px;
+  color:var(--cyan); white-space:nowrap; pointer-events:none;
+  opacity:0; transition:opacity .3s; z-index:10; backdrop-filter: blur(5px);
+}
+.card:hover .card-tooltip { opacity:1; }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px); z-index: 999;
+  display: none; align-items: center; justify-content: center;
+  opacity: 0; transition: opacity 0.3s ease;
+}
+.modal-overlay.active { display: flex; opacity: 1; }
+.modal-content {
+  background: rgba(11, 15, 21, 0.85);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  box-shadow: 0 0 30px rgba(0, 229, 255, 0.15), inset 0 0 20px rgba(0, 229, 255, 0.05);
+  border-radius: 12px; width: 90%; max-width: 1000px;
+  height: 85vh; padding: 20px 25px; position: relative;
+  display: flex; flex-direction: column; gap: 15px;
+  transform: translateY(20px); transition: transform 0.3s ease;
+}
+.modal-overlay.active .modal-content { transform: translateY(0); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.modal-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; color: var(--cyan); letter-spacing: 2px; }
+.modal-close {
+  color: var(--ts); font-size: 28px; cursor: pointer; transition: color 0.2s;
+  line-height: 1; margin-top: -5px;
+}
+.modal-close:hover { color: var(--red); }
+.modal-body { display: flex; gap: 20px; flex: 1; overflow: hidden; }
+@media(max-width: 800px) { .modal-body { flex-direction: column; overflow-y: auto; } }
+
+/* Grafik & Tabel di Modal */
+.modal-chart-wrapper { flex: 2; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border); padding: 10px; }
+.modal-table-wrapper { flex: 1; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid var(--border); overflow-y: auto; padding: 10px; }
+.modal-table { width: 100%; border-collapse: collapse; font-family: 'Share Tech Mono', monospace; font-size: 11px; text-align: left; }
+.modal-table th { background: rgba(0, 229, 255, 0.1); color: var(--cyan); padding: 8px; position: sticky; top: -10px; letter-spacing: 1px; }
+.modal-table td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); color: var(--tp); }
+.modal-table tbody tr:hover { background: rgba(255,255,255,0.03); }
+
+/* ── K3 RUNNING TEXT (SEAMLESS) ── */
+.k3-ticker-wrap {
+  width: 100%; background: #0b0f15;
+  border-top: 1px solid rgba(0, 230, 118, 0.3);
+  border-bottom: 1px solid rgba(0, 230, 118, 0.3);
+  overflow: hidden; padding: 6px 0;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.05) inset; flex-shrink: 0;
+}
+.k3-ticker {
+  display: inline-block; white-space: nowrap; padding-left: 0;
+  animation: ticker-seamless 60s linear infinite;
+  font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600;
+  letter-spacing: 2px; color: var(--green);
+  text-shadow: 0 0 5px rgba(0, 230, 118, 0.4);
+}
+.k3-ticker:hover { animation-play-state: paused; }
+
+@keyframes ticker-seamless {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); } 
+}
+
+/* ── ERROR & STRIP ── */
+#err {
+  background: rgba(255,59,82,0.1); border:1px solid rgba(255,59,82,0.4);
+  border-radius:5px; margin:0 4px 8px; padding:12px 16px;
+  font-family: 'Share Tech Mono', monospace; font-size:11px;
+  color: var(--red); display:none; line-height:1.8; box-shadow: 0 0 10px rgba(255,59,82,0.2);
+}
+.strip {
+  display:flex; align-items:center; flex-wrap:wrap; gap:14px;
+  padding:10px 4px; margin-top:auto;
+  font-family: 'Share Tech Mono', monospace; font-size:10px;
+  letter-spacing:1px; color:var(--tm); flex-shrink:0;
+}
+.si { display:flex; align-items:center; gap:6px; }
+.sdot { width:6px; height:6px; border-radius:50%; }
+.sr { margin-left:auto; color:var(--ts); }
+
+/* ── FOOTER ── */
+footer {
+  text-align:center; padding:12px; flex-shrink:0;
+  font-family: 'Share Tech Mono', monospace; font-size:9px;
+  letter-spacing:3px; color:var(--tm); background: #040608;
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1400px){ .grid,.grid-ext{grid-template-columns:repeat(5,1fr);} }
+@media(max-width:1200px){ .grid{grid-template-columns:repeat(4,1fr);} .grid-ext{grid-template-columns:repeat(3,1fr);} }
+@media(max-width:900px){ .grid,.grid-ext{grid-template-columns:repeat(3,1fr);} .title{font-size:13px;} }
+@media(max-width:600px){ .grid,.grid-ext{grid-template-columns:repeat(2,1fr);} .badge,.cd{display:none;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="hl">
+    <div class="badge"><div class="dot"></div>LIVE DATA</div>
+    <div class="title"><span>PRIMA</span> MILL PERFORMANCE</div>
+  </div>
+  <div class="hr">
+    <span class="cd" id="cd"></span>
+    <div class="clk" id="clk"></div>
+    <button class="btn" onclick="fetchData()">
+      <svg id="ri" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>REFRESH
+    </button>
+  </div>
+</header>
+
+<div class="k3-ticker-wrap">
+  <div class="k3-ticker">
+    <span>⚠️ UTAMAKAN KESELAMATAN DAN KESEHATAN KERJA (K3) ⚠️ &nbsp;|&nbsp; MARI BUDAYAKAN KERJA AMAN, SEHAT, DAN SELAMAT DEMI TERCAPAINYA ZERO ACCIDENT! &nbsp;|&nbsp; KELUARGA DI RUMAH MENUNGGU KEPULANGAN ANDA DENGAN SELAMAT. &nbsp;|&nbsp;&nbsp;</span>
+    <span aria-hidden="true">⚠️ UTAMAKAN KESELAMATAN DAN KESEHATAN KERJA (K3) ⚠️ &nbsp;|&nbsp; MARI BUDAYAKAN KERJA AMAN, SEHAT, DAN SELAMAT DEMI TERCAPAINYA ZERO ACCIDENT! &nbsp;|&nbsp; KELUARGA DI RUMAH MENUNGGU KEPULANGAN ANDA DENGAN SELAMAT. &nbsp;|&nbsp;&nbsp;</span>
+  </div>
+</div>
+
+<main>
+  <div id="err"></div>
+
+  <div class="sec" id="s1" style="display:none">LOSSES MONITORING</div>
+  <div class="grid" id="g-losses"></div>
+
+  <div class="sec" id="s2" style="display:none">EXTRACTION RATE</div>
+  <div class="grid-ext" id="g-ext"></div>
+
+  <div class="strip" id="strip" style="display:none">
+    <div class="si"><div class="sdot" style="background:var(--green); box-shadow:0 0 5px var(--green)"></div>NORMAL</div>
+    <div class="si"><div class="sdot" style="background:var(--yellow); box-shadow:0 0 5px var(--yellow)"></div>PERHATIAN</div>
+    <div class="si"><div class="sdot" style="background:var(--red); box-shadow:0 0 5px var(--red)"></div>MELEBIHI STD / DI BAWAH TARGET</div>
+    <div class="si"><div class="sdot" style="background:var(--cyan); box-shadow:0 0 5px var(--cyan)"></div>EXTRACTION RATE</div>
+    <div class="sr">UPDATE TERAKHIR: <span id="upd" style="color:var(--cyan)"></span></div>
+  </div>
+</main>
+
+<footer>PRIMA PALM OIL MILL &nbsp;—&nbsp; REAL-TIME MONITORING SYSTEM v3.0 &nbsp;|&nbsp; DATABASE: GOOGLE SHEETS LIVE</footer>
+
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">RIWAYAT DATA</div>
+      <span class="modal-close" onclick="closeModal()">&times;</span>
+    </div>
+    <div class="modal-body">
+      <div class="modal-chart-wrapper" id="modal-chart-container">
+        </div>
+      <div class="modal-table-wrapper">
+        <table class="modal-table">
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Nilai (%)</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="modal-table-body">
+            </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// URL API & Parameter (Ganti URL dengan Deployment URL terbaru Anda dari GAS)
+const API_URL = 'https://script.google.com/macros/s/AKfycbwQp0BPh4crPFPz25Z2iT92ctFqjMXP1me_F6VrTRRf18QCoe1meox4aItpFCAw9MOnBw/exec';
+const INTERVAL = 30;
+
+let globalData = []; // Menyimpan semua riwayat dari API
+let sparklineCharts = [];
+let mainModalChart = null;
+
+// Konfigurasi Parameter (Std = Standard, Target = Target Minimal)
+const LOSSES = [
+  {col:'Nut Breakage',  label:'NUT BREAKAGE',          std:15.00,  target:null},
+  {col:'Press Fiber',   label:'OIL LOSSES PRESS FIBER',  std:8.00,   target:null},
+  {col:'Cyclone',       label:'LOSSES FIBER CYCLONE',    std:1.00,   target:null},
+  {col:'LTDS',          label:'LOSSES LTDS',             std:1.00,   target:null},
+  {col:'Claybath',      label:'LOSSES CLAYBATH',         std:1.00,   target:null},
+  {col:'HP Decanter',   label:'HEAVY PHASE DECANTER',    std:0.90,   target:null},
+  {col:'Solid Decanter',label:'SOLID DECANTER',          std:3.00,   target:null},
+  {col:'AOL',           label:'AOL (ABSOLUTE OIL LOSSES)',std:4.50,  target:null},
+  {col:'Final Effluent',label:'FINAL EFFLUENT',          std:0.90,   target:null},
+  {col:'FFA',           label:'FFA (FREE FATTY ACID)',   std:5.00,   target:null},
+];
+const EXTRACTION = [
+  {col:'OER Todate', label:'OER TODATE (OIL EXTRACTION)',  std:null, target:21.00},
+  {col:'OER Today',  label:'OER TODAY (OIL EXTRACTION)',   std:null, target:21.00},
+  {col:'KER Todate', label:'KER TODATE (KERNEL EXTRACTION)',std:null, target:4.00 },
+  {col:'KER Today',  label:'KER TODAY (KERNEL EXTRACTION)', std:null, target:4.00 },
+  {col:'SER',        label:'SER (SHELL EXTRACTION RATE)',  std:null, target:2.00 },
+];
+
+// Helper Functions
+function safeId(str) { return str.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(); }
+function pf(v){ return parseFloat(String(v??'').replace(/[^0-9.\-]/g,'')); }
+
+// Mengambil riwayat riil dari globalData
+function getRealHistory(colName, maxDays) {
+  if (!globalData || globalData.length === 0) return [];
+  const sliced = globalData.slice(-maxDays); 
+  return sliced.map(row => {
+    // Mencari kolom tanggal (Tanggal/Date/Waktu/Timestamp)
+    const dateKeys = ['tanggal', 'date', 'waktu', 'timestamp'];
+    const keys = Object.keys(row);
+    let dateCol = keys.find(k => dateKeys.includes(k.toLowerCase())) || keys[0];
+
+    return {
+      date: row[dateCol] || '-',
+      value: pf(row[colName])
+    };
+  });
+}
+
+function getStatus(val, def){
+  if(val===null||isNaN(val)) return 'warn';
+  if(def.target!==null){
+    if(val>=def.target) return 'info';
+    if(val>=def.target*0.95) return 'warn';
+    return 'bad';
+  }
+  if(val<=def.std) return 'ok';
+  if(val<=def.std*1.15) return 'warn';
+  return 'bad';
+}
+
+function getStatusColor(status) {
+  switch(status) {
+    case 'ok': return '#00e676';
+    case 'warn': return '#ffc107';
+    case 'bad': return '#ff3b52';
+    case 'info': return '#00e5ff';
+    default: return '#ddeeff';
+  }
+}
+
+function tooltipText(val, def){
+  if(val===null||isNaN(val)) return 'DATA TIDAK TERSEDIA';
+  if(def.target!==null){
+    const diff = (val - def.target).toFixed(2);
+    return diff >= 0 ? `+${diff}% DI ATAS TARGET` : `${diff}% DI BAWAH TARGET`;
+  }
+  const diff = (val - def.std).toFixed(2);
+  return diff <= 0 ? `${Math.abs(diff)}% DI BAWAH STD` : `+${diff}% MELEBIHI STD`;
+}
+
+// Render Kartu
+function makeCard(def){
+  const latestRow = globalData[globalData.length - 1];
+  const val = pf(latestRow[def.col]);
+  
+  const v = (!isNaN(val)&&val!==null) ? val : null;
+  const st = getStatus(v, def);
+  const dv = v!==null ? v.toFixed(2)+'%' : '—';
+  
+  // Format desimal X.00%
+  const sub = def.std 
+    ? `Std: &lt; ${def.std.toFixed(2)}%` 
+    : `Target: &gt; ${def.target.toFixed(2)}%`;
+  
+  const tip = tooltipText(v, def);
+  const chartId = 'spark-' + safeId(def.col);
+  const safeJsonDef = JSON.stringify(def).replace(/"/g, '&quot;');
+
+  return `<div class="card ${st}" onclick="openModal(${safeJsonDef})">
+    <div class="card-tooltip">${tip}</div>
+    <div class="card-label">${def.label}</div>
+    <div class="card-val">${dv}</div>
+    <div class="card-sub">${sub}</div>
+    <div class="chart-container" id="${chartId}"></div>
+  </div>`;
+}
+
+// Render Grafik Sparkline 7 Hari di Kartu
+function renderSparklines(dataList) {
+  sparklineCharts.forEach(chart => chart.destroy());
+  sparklineCharts = [];
+
+  dataList.forEach(def => {
+    const historyData = getRealHistory(def.col, 7);
+    if(historyData.length === 0) return;
+
+    const latestVal = historyData[historyData.length - 1].value;
+    const st = getStatus(latestVal, def);
+    const color = getStatusColor(st);
+    
+    const seriesData = historyData.map(d => d.value);
+    const chartId = '#spark-' + safeId(def.col);
+
+    const options = {
+      series: [{ data: seriesData }],
+      chart: { type: 'area', height: 50, sparkline: { enabled: true }, animations: { enabled: true } },
+      stroke: { curve: 'smooth', width: 2 },
+      fill: {
+        type: 'gradient',
+        gradient: { shadeIntensity: 1, opacityFrom: 0.4, opacityTo: 0.0, stops: [0, 100] }
+      },
+      colors: [color],
+      tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: function () { return '' } } }, marker: { show: false } }
+    };
+
+    const element = document.querySelector(chartId);
+    if(element) {
+      const chart = new ApexCharts(element, options);
+      chart.render();
+      sparklineCharts.push(chart);
+    }
+  });
+}
+
+// Main Render
+function render(){
+  if(globalData.length === 0) return;
+  document.getElementById('g-losses').innerHTML = LOSSES.map(d=>makeCard(d)).join('');
+  document.getElementById('g-ext').innerHTML    = EXTRACTION.map(d=>makeCard(d)).join('');
+  
+  ['s1','s2','strip'].forEach(id=>document.getElementById(id).style.display='');
+  document.getElementById('upd').textContent = new Date().toTimeString().slice(0,8);
+
+  renderSparklines([...LOSSES, ...EXTRACTION]);
+}
+
+// ── LOGIC MODAL 30 HARI ──
+function openModal(def) {
+  const modal = document.getElementById('detail-modal');
+  document.getElementById('modal-title').textContent = def.label + " - DETAIL 30 HARI";
+  
+  // Ambil history 30 hari dari Sheet
+  const historyData = getRealHistory(def.col, 30);
+  const categories = historyData.map(d => d.date);
+  const seriesData = historyData.map(d => d.value);
+  const latestVal = seriesData[seriesData.length - 1];
+
+  // 1. Render Tabel
+  const tbody = document.getElementById('modal-table-body');
+  tbody.innerHTML = '';
+  
+  // Reverse: Data terbaru di atas
+  [...historyData].reverse().forEach(row => {
+    const st = getStatus(row.value, def);
+    
+    // PERBAIKAN LOGIKA TEKS STATUS DI SINI
+    let statusText = '';
+    if (st === 'ok') statusText = 'NORMAL';
+    else if (st === 'info') statusText = 'TERCAPAI';
+    else if (st === 'warn') statusText = 'PERHATIAN';
+    else {
+      // Jika statusnya 'bad', cek apakah ini parameter target atau standar
+      statusText = def.target !== null ? 'DI BAWAH TARGET' : 'MELEBIHI STD';
+    }
+
+    const statusColor = getStatusColor(st);
+    
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.date}</td>
+        <td style="font-weight:bold; color:${statusColor}">${row.value.toFixed(2)}%</td>
+        <td><span style="background:${statusColor}22; padding:2px 6px; border-radius:3px; color:${statusColor}; border:1px solid ${statusColor}55;">${statusText}</span></td>
+      </tr>
+    `;
+  });
+
+  // 2. Render Grafik Besar
+  if(mainModalChart) { mainModalChart.destroy(); }
+  
+  const refVal = def.std !== null ? def.std : def.target;
+  const refName = def.std !== null ? 'Standard' : 'Target';
+  const strokeColor = getStatusColor(getStatus(latestVal, def));
+
+  const options = {
+    series: [{ name: 'Nilai (%)', data: seriesData }],
+    chart: { type: 'area', height: '100%', foreColor: '#a1b4c7', toolbar: { show: false }, background: 'transparent' },
+    colors: [strokeColor],
+    stroke: { curve: 'smooth', width: 3 },
+    fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.5, opacityTo: 0.1, stops: [0, 90, 100] } },
+    dataLabels: { enabled: false },
+    xaxis: { categories: categories, axisBorder: { show: false }, axisTicks: { show: false } },
+    yaxis: { labels: { formatter: (val) => val.toFixed(1) + '%' } },
+    grid: { borderColor: 'rgba(255,255,255,0.05)', strokeDashArray: 4 },
+    annotations: {
+      yaxis: [{
+        y: refVal,
+        borderColor: '#ffc107',
+        strokeDashArray: 5,
+        label: { borderColor: '#ffc107', style: { color: '#000', background: '#ffc107', fontWeight: 'bold' }, text: `${refName}: ${refVal.toFixed(2)}%` }
+      }]
+    },
+    tooltip: { theme: 'dark' }
+  };
+
+  mainModalChart = new ApexCharts(document.querySelector("#modal-chart-container"), options);
+  mainModalChart.render();
+  modal.classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('detail-modal').classList.remove('active');
+}
+
+// Tutup modal jika luar area diklik
+document.getElementById('detail-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// Data Fetching
+async function fetchData(){
+  const icon = document.getElementById('ri');
+  const err  = document.getElementById('err');
+  icon.classList.add('spinning');
+  err.style.display = 'none';
+  try{
+    const res = await fetch(API_URL+'?t='+Date.now());
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    
+    // Validasi format data (Array tidak kosong)
+    if(!Array.isArray(json) || json.length === 0) throw new Error('Data Spreadsheet kosong atau format salah');
+    
+    // Simpan ke variabel global
+    globalData = json; 
+    
+    render();
+  } catch(e){
+    err.style.display='block';
+    err.innerHTML=`⚠ KONEKSI GAGAL: ${e.message}<br>
+      <span style="color:var(--tm);font-size:10px">Pastikan URL API benar & di-deploy ulang. Cek CORS.</span>`;
+  } finally{
+    icon.classList.remove('spinning');
+  }
+}
+
+// Jam
+function updateClock(){
+  const n=new Date();
+  const D=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+  const M=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  document.getElementById('clk').textContent=
+    `${D[n.getDay()]}, ${n.getDate().toString().padStart(2,'0')} ${M[n.getMonth()]} ${n.getFullYear()} | ${n.toTimeString().slice(0,8).replace(/:/g,'.')}`;
+}
+
+// Countdown
+let cdVal=INTERVAL, cdTimer;
+function startCountdown(){
+  if(cdTimer) clearInterval(cdTimer);
+  cdVal=INTERVAL;
+  cdTimer=setInterval(()=>{
+    cdVal--;
+    document.getElementById('cd').textContent = cdVal>0 ? `AUTO-REFRESH ${cdVal}s` : 'MEMPERBARUI...';
+    if(cdVal<=0){fetchData();cdVal=INTERVAL;}
+  },1000);
+}
+
+// Inisialisasi
+setInterval(updateClock,1000);
+updateClock();
+fetchData();
+startCountdown();
+</script>
+</body>
+</html>
